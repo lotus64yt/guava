@@ -1,23 +1,132 @@
 import { ThemedView } from "@/components/themed-view";
-import { BottomTabInset, MaxContentWidth, Spacing } from "@/constants/theme";
-import { ScrollView } from "react-native";
+import { Pagination } from "@/components/ui/pagination";
+import { SearchInput } from "@/components/ui/searchinput";
+import { MaxContentWidth } from "@/constants/theme";
+import { FetchNowPlayingMovies } from "@/services/tmdb";
+import { Movie } from "@/types/tmdb";
+import { Image } from "expo-image";
+import { useEffect, useState } from "react";
+import { ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [movies, setMovies] = useState<Movie[] | null | false>(null);
+  const [page, setPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+
+  useEffect(() => {
+    const fetchMovies = async () => {
+      try {
+        setMovies(null);
+        const res = await FetchNowPlayingMovies(page);
+        setMovies(res.results);
+        console.log("Fetched movies:", res.results);
+        setTotalPages(Math.min(res.total_pages, 500));
+      } catch (error) {
+        console.error("Error fetching movies:", error);
+        setMovies(false);
+      }
+    };
+    fetchMovies();
+  }, [page]);
+
   return (
-    <ThemedView className="flex-1 w-full">
+    <ThemedView className="flex-1 w-full bg-zinc-950">
       <SafeAreaView
-        className="flex-1 w-full self-center items-stretch px-4"
+        className="flex-1 w-full self-center px-4"
         style={{
-          paddingBottom: BottomTabInset + Spacing.three,
           maxWidth: MaxContentWidth,
         }}
       >
         <ScrollView
-          contentContainerClassName="grow justify-center py-4"
+          contentContainerClassName="grow pb-8"
           showsVerticalScrollIndicator={false}
         >
-          <ThemedView className="items-center justify-center w-full"></ThemedView>
+          <View className="my-6">
+            <Text className="text-3xl font-bold text-white mb-2">
+              À l'affiche
+            </Text>
+            <Text className="text-zinc-400 text-base mb-6">
+              Découvrez les films actuellement au cinéma.
+            </Text>
+            <SearchInput
+              onSearch={() => {}}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Rechercher un film..."
+            />
+          </View>
+
+          {movies === null && (
+            <View className="flex-1 items-center justify-center py-20">
+              <Text className="text-zinc-400 text-lg animate-pulse">
+                Chargement des films...
+              </Text>
+            </View>
+          )}
+
+          {movies === false && (
+            <View className="flex-1 items-center justify-center py-20">
+              <Text className="text-red-400 text-lg">
+                Erreur de chargement.
+              </Text>
+            </View>
+          )}
+
+          {movies && movies.length === 0 && (
+            <View className="flex-1 items-center justify-center py-20">
+              <Text className="text-zinc-400 text-lg">Aucun film trouvé.</Text>
+            </View>
+          )}
+
+          {movies && movies.length > 0 && (
+            <View className="flex-row flex-wrap justify-between">
+              {movies.map((movie) => (
+                <View key={movie.id} className="w-[48%] mb-6">
+                  <View className="rounded-xl overflow-hidden bg-zinc-900 border border-white/10 aspect-[2/3] mb-2 shadow-lg">
+                    {movie.poster_path ? (
+                      <Image
+                        source={{
+                          uri: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
+                        }}
+                        style={{ width: "100%", height: "100%" }}
+                        contentFit="cover"
+                        transition={300}
+                      />
+                    ) : (
+                      <View className="flex-1 items-center justify-center bg-zinc-800">
+                        <Text className="text-zinc-500 text-sm">
+                          Pas d'affiche
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text
+                    className="text-white font-semibold text-base"
+                    numberOfLines={1}
+                  >
+                    {movie.title}
+                  </Text>
+                  <Text className="text-zinc-400 text-xs mt-0.5">
+                    {new Date(movie.release_date).toLocaleDateString("fr-FR", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {movies && movies.length > 0 && (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+            />
+          )}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
