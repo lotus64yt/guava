@@ -1,3 +1,4 @@
+import { useFavorites } from "@/context/FavoritesContext";
 import { Movie } from "@/types/tmdb";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -10,6 +11,7 @@ export default function FilmDetails() {
   const { movie } = useLocalSearchParams<{ movie?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { toggleFavorite, isFavorite } = useFavorites();
 
   const film: Movie | null = movie
     ? (JSON.parse(decodeURIComponent(movie)) as Movie)
@@ -121,8 +123,11 @@ export default function FilmDetails() {
               <Download size={20} color="black" />
               <Text className="text-black font-semibold text-base ml-2">Télécharger</Text>
             </Pressable>
-            <Pressable className="flex-1 flex-row bg-zinc-800 py-3.5 rounded-xl items-center justify-center border border-zinc-700 space-x-2">
-              <Heart size={20} color="white" />
+            <Pressable 
+              className="flex-1 flex-row bg-zinc-800 py-3.5 rounded-xl items-center justify-center border border-zinc-700 space-x-2"
+              onPress={() => toggleFavorite(film)}
+            >
+              <Heart size={20} color={isFavorite(film.id) ? "#ef4444" : "white"} fill={isFavorite(film.id) ? "#ef4444" : "transparent"} />
               <Text className="text-white font-semibold text-base ml-2">Favoris</Text>
             </Pressable>
           </View>
