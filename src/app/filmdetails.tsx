@@ -2,7 +2,7 @@ import { useFavorites } from "@/context/FavoritesContext";
 import { Movie } from "@/types/tmdb";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, Calendar, Download, Heart, Star } from "lucide-react-native";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -42,6 +42,7 @@ export default function FilmDetails() {
 
   return (
     <View className="flex-1 bg-zinc-950">
+      <Stack.Screen options={{ presentation: "modal" }} />
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         <View className="w-full h-72 bg-zinc-900 relative">
           {film.backdrop_path ? (

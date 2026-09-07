@@ -13,10 +13,7 @@ export default function TabLayout() {
   return (
     <FavoritesProvider>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="filmdetails" options={{ presentation: 'modal' }} />
-        </Stack>
+        <Stack screenOptions={{ headerShown: false }} />
         <AnimatedSplashOverlay />
       </ThemeProvider>
     </FavoritesProvider>
