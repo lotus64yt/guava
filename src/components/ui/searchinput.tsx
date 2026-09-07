@@ -90,7 +90,7 @@ export function SearchInput({
         <View style={styles.suggestionsContainer}>
           {filteredSuggestions.map((item, index) => (
             <Pressable
-              key={item}
+              key={item + index}
               style={[
                 styles.suggestionItem,
                 index !== filteredSuggestions.length - 1 &&
