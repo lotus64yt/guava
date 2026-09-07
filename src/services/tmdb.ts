@@ -7,13 +7,11 @@ interface Response<T> {
   total_results: number;
 }
 
-export function FetchDiscoverMovies(page: number): Promise<Response<Movie>> {
-  return fetch(
-    `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.EXPO_PUBLIC_TMDB_API_KEY}&page=${page}`,
-  ).then((response) => response.json());
-}
+type MediaResult = Movie | SearchResult;
 
-export function FetchNowPlayingMovies(page: number): Promise<Response<Movie>> {
+export function FetchNowPlayingMovies(
+  page: number,
+): Promise<Response<MediaResult>> {
   return fetch(
     `https://api.themoviedb.org/3/trending/all/day?api_key=${process.env.EXPO_PUBLIC_TMDB_API_KEY}&page=${page}`,
   ).then((response) => response.json());
