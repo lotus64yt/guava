@@ -33,7 +33,7 @@ export function SearchInput({
     () =>
       suggestions
         .filter((item) => item.toLowerCase().includes(query.toLowerCase()))
-        .slice(0, 6),
+        .slice(0, 4),
     [suggestions, query],
   );
 

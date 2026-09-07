@@ -2,8 +2,8 @@ import { ThemedView } from "@/components/themed-view";
 import { Pagination } from "@/components/ui/pagination";
 import { SearchInput } from "@/components/ui/searchinput";
 import { MaxContentWidth } from "@/constants/theme";
-import { FetchNowPlayingMovies } from "@/services/tmdb";
-import { Movie } from "@/types/tmdb";
+import { FetchNowPlayingMovies, FetchSearch } from "@/services/tmdb";
+import { Movie, SearchResult } from "@/types/tmdb";
 import { Image } from "expo-image";
 import { useEffect, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
@@ -12,8 +12,26 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [movies, setMovies] = useState<Movie[] | null | false>(null);
+  const [searchResults, setSearchResults] = useState<
+    SearchResult[] | null | false
+  >(null);
   const [page, setPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
+
+  const searchMovies = async () => {
+    if (searchQuery.trim() === "") {
+      return;
+    }
+
+    try {
+      setSearchResults(null);
+      const res = await FetchSearch(searchQuery, page);
+      setSearchResults(res.results);
+    } catch (error) {
+      console.error("Error searching movies:", error);
+      setSearchResults(false);
+    }
+  };
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -21,7 +39,6 @@ export default function HomeScreen() {
         setMovies(null);
         const res = await FetchNowPlayingMovies(page);
         setMovies(res.results);
-        console.log("Fetched movies:", res.results);
         setTotalPages(Math.min(res.total_pages, 500));
       } catch (error) {
         console.error("Error fetching movies:", error);
@@ -30,6 +47,10 @@ export default function HomeScreen() {
     };
     fetchMovies();
   }, [page]);
+
+  useEffect(() => {
+    searchMovies();
+  }, [searchQuery, page]);
 
   return (
     <ThemedView className="flex-1 w-full bg-zinc-950">
@@ -51,8 +72,17 @@ export default function HomeScreen() {
               Découvrez les films actuellement au cinéma.
             </Text>
             <SearchInput
-              onSearch={() => {}}
+              onSearch={(query) => {
+                setSearchQuery(query);
+              }}
               value={searchQuery}
+              suggestions={
+                Array.isArray(searchResults)
+                  ? searchResults.map(
+                      (res: SearchResult) => res.title || "unknown",
+                    )
+                  : ["Aucun film trouvé"]
+              }
               onChangeText={setSearchQuery}
               placeholder="Rechercher un film..."
             />
