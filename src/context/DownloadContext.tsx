@@ -58,30 +58,20 @@ export const DownloadProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     try {
       const vidzyUrl = await GetVidzyLink(filmTitle, (status, msg) => {
-        updateState(filmId, {
-          status,
-          message: msg || "",
-        });
+        updateState(filmId, { status, message: msg || "" });
       });
 
       if (!vidzyUrl) {
-        updateState(filmId, {
-          status: "error",
-          progress: 0,
-          message: "Lien non disponible",
-        });
+        updateState(filmId, { status: "error", progress: 0, message: "Lien non disponible" });
         return;
       }
 
-      updateState(filmId, {
-        status: "downloading",
-        progress: 0,
-        message: "Début du téléchargement...",
-      });
+      updateState(filmId, { status: "downloading", progress: 0, message: "Début du téléchargement..." });
 
       const sanitizeFilename = filmTitle.replace(/[^a-zA-Z0-9 àâäéèêëîïôöùûüçÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ._-]/g, "_").trim();
       const fileUri = `${FileSystem.documentDirectory}${sanitizeFilename}.mp4`;
 
+      let startTime = Date.now();
       let lastTime = Date.now();
       let lastWritten = 0;
       let smoothedSpeed = 0;
@@ -100,7 +90,7 @@ export const DownloadProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           const bytesDiff = written - lastWritten;
           const currentSpeed = bytesDiff / timeDiff;
 
-          smoothedSpeed = smoothedSpeed === 0 ? currentSpeed : smoothedSpeed * 0.7 + currentSpeed * 0.3;
+          smoothedSpeed = smoothedSpeed === 0 ? currentSpeed : smoothedSpeed * 0.75 + currentSpeed * 0.25;
 
           lastTime = now;
           lastWritten = written;
@@ -141,7 +131,7 @@ export const DownloadProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           },
           sessionType: FileSystem.FileSystemSessionType.BACKGROUND,
         },
-        callback,
+        callback
       );
 
       resumablesRef.current[filmId] = downloadResumable;
