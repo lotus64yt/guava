@@ -1,3 +1,4 @@
+import { Movie } from "@/types/tmdb";
 import { Search, X } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import {
@@ -9,9 +10,16 @@ import {
   View,
 } from "react-native";
 
+export interface SearchSuggestionItem {
+  id: number;
+  title: string;
+  movieData?: Movie;
+}
+
 interface SearchInputProps extends TextInputProps {
   onSearch: (query: string) => void;
-  suggestions?: string[];
+  suggestions?: SearchSuggestionItem[];
+  onSelectSuggestion?: (item: SearchSuggestionItem) => void;
   containerStyle?: object;
 }
 
@@ -20,6 +28,7 @@ export function SearchInput({
   containerStyle,
   onSearch,
   suggestions = [],
+  onSelectSuggestion,
   value,
   onChangeText,
   onFocus,
@@ -32,8 +41,8 @@ export function SearchInput({
   const filteredSuggestions = useMemo(
     () =>
       suggestions
-        .filter((item) => item.toLowerCase().includes(query.toLowerCase()))
-        .slice(0, 4),
+        .filter((item) => item.title.toLowerCase().includes(query.toLowerCase()))
+        .slice(0, 5),
     [suggestions, query],
   );
 
@@ -53,7 +62,9 @@ export function SearchInput({
             onFocus?.(event);
           }}
           onBlur={(event) => {
-            setFocused(false);
+            setTimeout(() => {
+              setFocused(false);
+            }, 200);
             onBlur?.(event);
           }}
           onChangeText={(text: string) => {
@@ -86,24 +97,26 @@ export function SearchInput({
         </Pressable>
       </View>
 
-      {focused && filteredSuggestions.length > 0 ? (
+      {filteredSuggestions.length > 0 && (focused || query.length > 0) ? (
         <View style={styles.suggestionsContainer}>
           {filteredSuggestions.map((item, index) => (
             <Pressable
-              key={item + index}
+              key={item.id + "-" + index}
               style={[
                 styles.suggestionItem,
                 index !== filteredSuggestions.length - 1 &&
                   styles.suggestionBorder,
               ]}
               onPress={() => {
-                setQuery(item);
-                onChangeText?.(item);
-                onSearch(item);
+                setQuery(item.title);
+                onChangeText?.(item.title);
                 setFocused(false);
+                if (onSelectSuggestion) {
+                  onSelectSuggestion(item);
+                }
               }}
             >
-              <Text style={styles.suggestionText}>{item}</Text>
+              <Text style={styles.suggestionText}>{item.title}</Text>
             </Pressable>
           ))}
         </View>

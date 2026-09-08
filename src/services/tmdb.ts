@@ -22,6 +22,6 @@ export function FetchSearch(
   page: number = 1,
 ): Promise<Response<SearchResult>> {
   return fetch(
-    `https://api.themoviedb.org/3/search/multi?api_key=${process.env.EXPO_PUBLIC_TMDB_API_KEY}&query=${query}&page=${page}`,
+    `https://api.themoviedb.org/3/search/multi?language=fr-FR&api_key=${process.env.EXPO_PUBLIC_TMDB_API_KEY}&query=${query}&page=${page}`,
   ).then((response) => response.json());
 }

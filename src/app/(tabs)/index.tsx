@@ -1,16 +1,17 @@
 import { ThemedView } from "@/components/themed-view";
 import { Pagination } from "@/components/ui/pagination";
-import { SearchInput } from "@/components/ui/searchinput";
+import { SearchInput, SearchSuggestionItem } from "@/components/ui/searchinput";
 import { MaxContentWidth } from "@/constants/theme";
 import { FetchNowPlayingMovies, FetchSearch } from "@/services/tmdb";
 import { Movie, SearchResult } from "@/types/tmdb";
 import { Image } from "expo-image";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [movies, setMovies] = useState<Movie[] | null | false>(null);
   const [searchResults, setSearchResults] = useState<
@@ -64,6 +65,7 @@ export default function HomeScreen() {
         <ScrollView
           contentContainerClassName="grow pb-8"
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           <View className="my-6">
             <Text className="text-3xl font-bold text-white mb-2">
@@ -79,11 +81,30 @@ export default function HomeScreen() {
               value={searchQuery}
               suggestions={
                 Array.isArray(searchResults)
-                  ? searchResults.map(
-                      (res: SearchResult) => res.title || "unknown",
-                    )
-                  : ["Aucun film trouvé"]
+                  ? searchResults.map((res: any) => {
+                      const movieObj: Movie = {
+                        ...res,
+                        title: res.title || res.name || "Film inconnu",
+                        release_date: res.release_date || res.first_air_date || "",
+                      };
+                      return {
+                        id: res.id,
+                        title: movieObj.title,
+                        movieData: movieObj,
+                      };
+                    })
+                  : []
               }
+              onSelectSuggestion={(item: SearchSuggestionItem) => {
+                if (item.movieData) {
+                  router.push({
+                    pathname: "/filmdetails",
+                    params: {
+                      movie: encodeURIComponent(JSON.stringify(item.movieData)),
+                    },
+                  });
+                }
+              }}
               onChangeText={setSearchQuery}
               placeholder="Rechercher un film..."
             />
