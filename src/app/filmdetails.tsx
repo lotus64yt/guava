@@ -1,9 +1,17 @@
+import { useDownloads } from "@/context/DownloadContext";
 import { useFavorites } from "@/context/FavoritesContext";
 import { Movie } from "@/types/tmdb";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, Calendar, Download, Heart, Star } from "lucide-react-native";
+import {
+  ArrowLeft,
+  Calendar,
+  Download,
+  Heart,
+  Star,
+  XCircle,
+} from "lucide-react-native";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -12,6 +20,7 @@ export default function FilmDetails() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { toggleFavorite, isFavorite } = useFavorites();
+  const { startDownload, cancelDownload, getDownloadState } = useDownloads();
 
   const film: Movie | null = movie
     ? (JSON.parse(decodeURIComponent(movie)) as Movie)
@@ -30,6 +39,19 @@ export default function FilmDetails() {
       </View>
     );
   }
+
+  const downloadState = getDownloadState(film.id);
+
+  const handlePressDownload = () => {
+    if (
+      downloadState.status === "initialization" ||
+      downloadState.status === "downloading"
+    ) {
+      cancelDownload(film.id);
+    } else {
+      startDownload(film.id, film.title);
+    }
+  };
 
   const formattedDate = new Date(film.release_date).toLocaleDateString(
     "fr-FR",
@@ -119,17 +141,87 @@ export default function FilmDetails() {
             </View>
           </View>
 
-          <View className="flex-row items-center mt-6 mb-8 space-x-4">
-            <Pressable className="flex-1 flex-row bg-white py-3.5 rounded-xl items-center justify-center space-x-2">
-              <Download size={20} color="black" />
-              <Text className="text-black font-semibold text-base ml-2">Télécharger</Text>
+          <View className="mt-6 mb-8 space-y-3">
+            <Pressable
+              className={`w-full rounded-xl overflow-hidden relative border border-zinc-800 ${
+                downloadState.status === "idle" ||
+                downloadState.status === "completed" ||
+                downloadState.status === "error"
+                  ? "bg-white"
+                  : "bg-zinc-900"
+              }`}
+              onPress={handlePressDownload}
+            >
+              {(downloadState.status === "initialization" ||
+                downloadState.status === "downloading" ||
+                downloadState.status === "completed") && (
+                <View
+                  className="absolute top-0 bottom-0 left-0 bg-emerald-500/80"
+                  style={{
+                    width:
+                      downloadState.status === "initialization"
+                        ? "0%"
+                        : `${downloadState.progress}%`,
+                  }}
+                />
+              )}
+
+              <View className="py-3.5 px-4 flex-row items-center justify-center space-x-2 z-10">
+                {downloadState.status === "initialization" ||
+                downloadState.status === "downloading" ? (
+                  <XCircle size={20} color="white" />
+                ) : (
+                  <Download
+                    size={20}
+                    color={
+                      downloadState.status === "idle" ||
+                      downloadState.status === "completed" ||
+                      downloadState.status === "error"
+                        ? "black"
+                        : "white"
+                    }
+                  />
+                )}
+                <View className="flex-col items-center ml-2">
+                  <Text
+                    className={`font-semibold text-base ${
+                      downloadState.status === "idle" ||
+                      downloadState.status === "completed" ||
+                      downloadState.status === "error"
+                        ? "text-black"
+                        : "text-white"
+                    }`}
+                  >
+                    {downloadState.status === "idle" && "Télécharger"}
+                    {downloadState.status === "initialization" &&
+                      "Initialisation..."}
+                    {downloadState.status === "downloading" &&
+                      `Téléchargement ${downloadState.progress}%`}
+                    {downloadState.status === "completed" && "Terminé !"}
+                    {downloadState.status === "error" && "Réessayer"}
+                  </Text>
+                  {(downloadState.status === "initialization" ||
+                    downloadState.status === "downloading") && (
+                    <Text className="text-xs text-zinc-300 font-normal mt-0.5">
+                      {downloadState.message}
+                    </Text>
+                  )}
+                </View>
+              </View>
             </Pressable>
-            <Pressable 
-              className="flex-1 flex-row bg-zinc-800 py-3.5 rounded-xl items-center justify-center border border-zinc-700 space-x-2"
+
+            <Pressable
+              className="w-full mt-3 flex-row bg-zinc-800 py-3.5 rounded-xl items-center justify-center border border-zinc-700 space-x-2"
               onPress={() => toggleFavorite(film)}
             >
-              <Heart size={20} color={isFavorite(film.id) ? "#ef4444" : "white"} fill={isFavorite(film.id) ? "#ef4444" : "transparent"} />
-              <Text className="text-white font-semibold text-base ml-2">Favoris</Text>
+              <Heart
+                size={20}
+                color={isFavorite(film.id) ? "#ef4444" : "white"}
+                fill={isFavorite(film.id) ? "#ef4444" : "transparent"}
+              />
+              <Text className="text-white font-semibold text-base ml-2">
+                Favoris
+              </Text>
             </Pressable>
           </View>
 
