@@ -8,7 +8,7 @@ export function Separator({ style, ...props }: ViewProps) {
 
   return (
     <View
-      accessibilityRole="separator"
+      accessible={true}
       style={[
         styles.separator,
         {

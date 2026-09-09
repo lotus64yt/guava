@@ -12,9 +12,9 @@
       }
     },
     {
-      "label": "Build Android Local (npx expo run:android)",
+      "label": "Build APK local (gradlew assembleRelease)",
       "type": "shell",
-      "command": "npx expo run:android",
+      "command": "cd android && ./gradlew assembleRelease && cp app/build/outputs/apk/release/app-release.apk ../guava-release.apk",
       "group": "build",
       "presentation": {
         "reveal": "always",

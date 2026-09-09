@@ -1,4 +1,4 @@
-import { SymbolView } from "expo-symbols";
+import { ChevronRight } from "lucide-react-native";
 import { PropsWithChildren, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
@@ -27,15 +27,9 @@ export function Collapsible({
           ]}
         >
           <View style={styles.button}>
-            <SymbolView
-              name={{
-                ios: "chevron.right",
-                android: "chevron_right",
-                web: "chevron_right",
-              }}
+            <ChevronRight
               size={14}
-              weight="bold"
-              tintColor={theme.text}
+              color={theme.text}
               style={{ transform: [{ rotate: isOpen ? "90deg" : "0deg" }] }}
             />
           </View>

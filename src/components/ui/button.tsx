@@ -93,13 +93,13 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
-      style={({ pressed }) => [
+      style={(state) => [
         styles.root,
         variantStyles[variant],
         sizeStyles[size],
-        pressed && !disabled && styles.pressed,
+        state.pressed && !disabled && styles.pressed,
         disabled && styles.disabled,
-        style,
+        typeof style === "function" ? style(state) : style,
       ]}
       {...props}
     >

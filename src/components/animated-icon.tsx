@@ -1,9 +1,9 @@
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as SplashScreen from 'expo-splash-screen';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dimensions, StyleSheet, View } from 'react-native';
-import Animated, { Easing, Keyframe } from 'react-native-reanimated';
-import { scheduleOnRN } from 'react-native-worklets';
+import Animated, { Easing, Keyframe, runOnJS } from 'react-native-reanimated';
 
 const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
 const DURATION = 600;
@@ -11,6 +11,14 @@ const DURATION = 600;
 export function AnimatedSplashOverlay() {
   const [animate, setAnimate] = useState(false);
   const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+      setVisible(false);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   if (!visible) return null;
 
@@ -40,7 +48,7 @@ export function AnimatedSplashOverlay() {
       entering={splashKeyframe.duration(DURATION).withCallback((finished) => {
         'worklet';
         if (finished) {
-          scheduleOnRN(setVisible, false);
+          runOnJS(setVisible)(false);
         }
       })}
       style={styles.splashOverlay}>
@@ -49,9 +57,11 @@ export function AnimatedSplashOverlay() {
   ) : (
     <View
       onLayout={() => {
-        SplashScreen.hideAsync().finally(() => {
-          setAnimate(true);
-        });
+        SplashScreen.hideAsync()
+          .catch(() => {})
+          .finally(() => {
+            setAnimate(true);
+          });
       }}
       style={styles.splashOverlay}>
       {image}
@@ -102,7 +112,12 @@ export function AnimatedIcon() {
         <Image style={styles.glow} source={require('@/assets/images/logo-glow.png')} />
       </Animated.View>
 
-      <Animated.View entering={keyframe.duration(DURATION)} style={styles.background} />
+      <Animated.View entering={keyframe.duration(DURATION)} style={styles.background}>
+        <LinearGradient
+          colors={['#3C9FFE', '#0274DF']}
+          style={styles.gradient}
+        />
+      </Animated.View>
       <Animated.View style={styles.imageContainer} entering={logoKeyframe.duration(DURATION)}>
         <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
       </Animated.View>
@@ -133,14 +148,19 @@ const styles = StyleSheet.create({
   },
   background: {
     borderRadius: 40,
-    experimental_backgroundImage: `linear-gradient(180deg, #3C9FFE, #0274DF)`,
     width: 128,
     height: 128,
     position: 'absolute',
+    overflow: 'hidden',
+  },
+  gradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: '#09090b',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
