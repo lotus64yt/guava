@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useRef } from "react";
 import * as FileSystem from "expo-file-system/legacy";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GetVidzyLink } from "@/services/fs";
 
 export type DownloadStatus = "idle" | "initialization" | "downloading" | "completed" | "error";
@@ -18,13 +19,35 @@ interface DownloadContextType {
   startDownload: (filmId: number, filmTitle: string) => Promise<void>;
   cancelDownload: (filmId: number) => Promise<void>;
   getDownloadState: (filmId: number) => ActiveDownload;
+  getLocalVideoUri: (filmId: number) => string | undefined;
 }
 
 const DownloadContext = createContext<DownloadContextType | undefined>(undefined);
 
 export const DownloadProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [downloads, setDownloads] = useState<Record<number, ActiveDownload>>({});
+  const [savedVideos, setSavedVideos] = useState<Record<number, string>>({});
   const resumablesRef = useRef<Record<number, FileSystem.DownloadResumable>>({});
+
+  React.useEffect(() => {
+    const loadSaved = async () => {
+      try {
+        const stored = await AsyncStorage.getItem("@guava_imported_videos");
+        if (stored) {
+          const list: { id: string; name: string; uri: string }[] = JSON.parse(stored);
+          const map: Record<number, string> = {};
+          list.forEach((item) => {
+            const numId = Number(item.id);
+            if (!isNaN(numId)) {
+              map[numId] = item.uri;
+            }
+          });
+          setSavedVideos(map);
+        }
+      } catch (e) {}
+    };
+    loadSaved();
+  }, []);
 
   const updateState = (filmId: number, patch: Partial<ActiveDownload>) => {
     setDownloads((prev) => ({
@@ -145,6 +168,22 @@ export const DownloadProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           progress: 100,
           message: "Téléchargement terminé !",
         });
+
+        try {
+          const STORAGE_KEY = "@guava_imported_videos";
+          const existingStr = await AsyncStorage.getItem(STORAGE_KEY);
+          const existing = existingStr ? JSON.parse(existingStr) : [];
+          const updated = [
+            {
+              id: filmId.toString(),
+              name: `${filmTitle}.mp4`,
+              uri: result.uri,
+            },
+            ...existing.filter((item: any) => item.id !== filmId.toString() && item.uri !== result.uri),
+          ];
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+          setSavedVideos((prev) => ({ ...prev, [filmId]: result.uri }));
+        } catch (e) {}
       } else {
         updateState(filmId, {
           status: "error",
@@ -176,15 +215,28 @@ export const DownloadProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const getDownloadState = (filmId: number): ActiveDownload => {
-    return (
-      downloads[filmId] || {
+    const active = downloads[filmId];
+    if (active) return active;
+    if (savedVideos[filmId]) {
+      return {
         filmId,
         filmTitle: "",
-        status: "idle",
-        progress: 0,
-        message: "",
-      }
-    );
+        status: "completed",
+        progress: 100,
+        message: "Téléchargement terminé !",
+      };
+    }
+    return {
+      filmId,
+      filmTitle: "",
+      status: "idle",
+      progress: 0,
+      message: "",
+    };
+  };
+
+  const getLocalVideoUri = (filmId: number): string | undefined => {
+    return savedVideos[filmId];
   };
 
   return (
@@ -194,6 +246,7 @@ export const DownloadProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         startDownload,
         cancelDownload,
         getDownloadState,
+        getLocalVideoUri,
       }}
     >
       {children}

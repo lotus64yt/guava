@@ -9,6 +9,7 @@ import {
   Calendar,
   Download,
   Heart,
+  Play,
   Star,
   XCircle,
 } from "lucide-react-native";
@@ -20,7 +21,7 @@ export default function FilmDetails() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { toggleFavorite, isFavorite } = useFavorites();
-  const { startDownload, cancelDownload, getDownloadState } = useDownloads();
+  const { startDownload, cancelDownload, getDownloadState, getLocalVideoUri } = useDownloads();
 
   const film: Movie | null = movie
     ? (JSON.parse(decodeURIComponent(movie)) as Movie)
@@ -41,9 +42,18 @@ export default function FilmDetails() {
   }
 
   const downloadState = getDownloadState(film.id);
+  const localUri = getLocalVideoUri(film.id);
 
   const handlePressDownload = () => {
-    if (
+    if (downloadState.status === "completed" && localUri) {
+      router.push({
+        pathname: "/player",
+        params: {
+          uri: localUri,
+          title: film.title,
+        },
+      });
+    } else if (
       downloadState.status === "initialization" ||
       downloadState.status === "downloading"
     ) {
@@ -144,17 +154,16 @@ export default function FilmDetails() {
           <View className="mt-6 mb-8 space-y-3">
             <Pressable
               className={`w-full rounded-xl overflow-hidden relative border border-zinc-800 ${
-                downloadState.status === "idle" ||
-                downloadState.status === "completed" ||
-                downloadState.status === "error"
+                downloadState.status === "completed"
+                  ? "bg-emerald-500"
+                  : downloadState.status === "idle" || downloadState.status === "error"
                   ? "bg-white"
                   : "bg-zinc-900"
               }`}
               onPress={handlePressDownload}
             >
               {(downloadState.status === "initialization" ||
-                downloadState.status === "downloading" ||
-                downloadState.status === "completed") && (
+                downloadState.status === "downloading") && (
                 <View
                   className="absolute top-0 bottom-0 left-0 bg-emerald-500/80"
                   style={{
@@ -167,15 +176,16 @@ export default function FilmDetails() {
               )}
 
               <View className="py-3.5 px-4 flex-row items-center justify-center space-x-2 z-10">
-                {downloadState.status === "initialization" ||
-                downloadState.status === "downloading" ? (
+                {downloadState.status === "completed" ? (
+                  <Play size={20} color="white" fill="white" />
+                ) : downloadState.status === "initialization" ||
+                  downloadState.status === "downloading" ? (
                   <XCircle size={20} color="white" />
                 ) : (
                   <Download
                     size={20}
                     color={
                       downloadState.status === "idle" ||
-                      downloadState.status === "completed" ||
                       downloadState.status === "error"
                         ? "black"
                         : "white"
@@ -185,9 +195,9 @@ export default function FilmDetails() {
                 <View className="flex-col items-center ml-2">
                   <Text
                     className={`font-semibold text-base ${
-                      downloadState.status === "idle" ||
-                      downloadState.status === "completed" ||
-                      downloadState.status === "error"
+                      downloadState.status === "completed"
+                        ? "text-white"
+                        : downloadState.status === "idle" || downloadState.status === "error"
                         ? "text-black"
                         : "text-white"
                     }`}
@@ -197,7 +207,7 @@ export default function FilmDetails() {
                       "Initialisation..."}
                     {downloadState.status === "downloading" &&
                       `Téléchargement ${downloadState.progress}%`}
-                    {downloadState.status === "completed" && "Terminé !"}
+                    {downloadState.status === "completed" && "Lire la vidéo"}
                     {downloadState.status === "error" && "Réessayer"}
                   </Text>
                   {(downloadState.status === "initialization" ||
