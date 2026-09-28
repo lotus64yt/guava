@@ -13,7 +13,7 @@ export async function GetCurrentFSUrl(): Promise<string> {
       return match[1].replace(/\/$/, "");
     }
   } catch (error) {}
-  return "https://fs23.lol";
+  return "https://fs27.lol";
 }
 
 export type DownloadStatus =
@@ -87,6 +87,47 @@ export async function ResolveDirectDownloadUrl(
   return vidzyPageUrl;
 }
 
+export async function ResolveVidzyEmbedStreamUrl(
+  embedUrl: string,
+  onStatusChange?: (status: DownloadStatus, message?: string) => void,
+): Promise<string | undefined> {
+  try {
+    onStatusChange?.("initialization", "Initialisation...");
+
+    const headers = {
+      "User-Agent":
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    };
+
+    const html = await fetch(embedUrl, { headers }).then((res) => res.text());
+
+    // 1. Check for video/source tag src attribute with direct mp4 (ignore blob: and .m3u8)
+    const videoSrcMatch =
+      html.match(/<video[^>]+src=["']([^"']+\.mp4[^"']*)["']/i) ||
+      html.match(/<source[^>]+src=["']([^"']+\.mp4[^"']*)["']/i);
+
+    if (
+      videoSrcMatch &&
+      videoSrcMatch[1] &&
+      !videoSrcMatch[1].startsWith("blob:")
+    ) {
+      return videoSrcMatch[1];
+    }
+
+    // 2. Check for JS player direct mp4 source definitions
+    const jsSourceMatch =
+      html.match(/file\s*:\s*["']([^"']+\.mp4[^"']*)["']/i) ||
+      html.match(/src\s*:\s*["']([^"']+\.mp4[^"']*)["']/i) ||
+      html.match(/["'](https?:\/\/[^"']+\.mp4[^"']*)["']/i);
+
+    if (jsSourceMatch && jsSourceMatch[1]) {
+      return jsSourceMatch[1];
+    }
+  } catch (error) {}
+
+  return undefined;
+}
+
 export async function GetVidzyLink(
   movieTitle: string,
   onStatusChange?: (status: DownloadStatus, message?: string) => void,
@@ -108,18 +149,76 @@ export async function GetVidzyLink(
       body: `query=${encodeURIComponent(movieTitle)}&page=1`,
     }).then((res) => res.text());
 
-    const newsIdMatches = [
-      ...searchHtml.matchAll(/location\.href=['"][^'"]*?\/(\d+)-[^'"]*['"]/gi),
-    ].map((m) => m[1]);
+    const matches = [
+      ...searchHtml.matchAll(/href=['"]([^'"]*?\/(\d+)-([^'"]*))['"]/gi),
+    ].map((m) => ({
+      url: m[1],
+      id: m[2],
+      slug: m[3].replace(/\.html$/i, ""),
+    }));
 
-    if (!newsIdMatches.length) {
+    if (!matches.length) {
       return undefined;
     }
 
+    const normTarget = movieTitle
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, " ")
+      .trim();
+    const targetWords = normTarget.split(/\s+/).filter((w) => w.length > 0);
+
+    const scored = matches.map((item) => {
+      const normSlug = item.slug
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, " ")
+        .trim();
+      const slugWords = normSlug.split(/\s+/).filter((w) => w.length > 0);
+
+      let score = 0;
+      for (const tw of targetWords) {
+        if (slugWords.includes(tw)) score += 10;
+      }
+
+      if (
+        normSlug.includes("bande annonce") ||
+        normSlug.includes("teaser") ||
+        normSlug.includes("trailer")
+      ) {
+        score -= 50;
+      }
+      if (normSlug.includes("saison") && !normTarget.includes("saison")) {
+        score -= 30;
+      }
+
+      const extraWords = slugWords.filter(
+        (w) =>
+          !targetWords.includes(w) &&
+          !["film", "streaming", "complet", "vf", "vostfr", "french"].includes(
+            w,
+          ),
+      );
+      score -= extraWords.length * 5;
+
+      const cleanedSlug = normSlug
+        .replace(/\b(film|streaming|complet|vf|vostfr|french)\b/g, "")
+        .trim();
+      if (cleanedSlug === normTarget) {
+        score += 50;
+      }
+
+      return { ...item, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+
     onStatusChange?.("initialization", "Initialisation...");
 
-    for (const newsId of newsIdMatches.slice(0, 3)) {
-      const filmApiUrl = `${baseUrl}/engine/ajax/film_api.php?id=${newsId}`;
+    for (const item of scored.slice(0, 4)) {
+      const filmApiUrl = `${baseUrl}/engine/ajax/film_api.php?id=${item.id}`;
 
       const res = await fetch(filmApiUrl, {
         headers: {
@@ -141,6 +240,14 @@ export async function GetVidzyLink(
           vidzyPlayers.vff;
 
         if (embedUrl) {
+          const streamUrl = await ResolveVidzyEmbedStreamUrl(
+            embedUrl,
+            onStatusChange,
+          );
+          if (streamUrl) {
+            return streamUrl;
+          }
+
           const vidzyPageUrl = embedUrl.replace(
             /\/embed-([a-zA-Z0-9_-]+)\.html/i,
             "/d/$1.html",

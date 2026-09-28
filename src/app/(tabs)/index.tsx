@@ -78,6 +78,14 @@ export default function HomeScreen() {
               onSearch={(query) => {
                 setSearchQuery(query);
               }}
+              onSubmitSearch={(query) => {
+                if (query.trim()) {
+                  router.push({
+                    pathname: "/search" as any,
+                    params: { q: query.trim() },
+                  });
+                }
+              }}
               value={searchQuery}
               suggestions={
                 Array.isArray(searchResults)
@@ -90,6 +98,8 @@ export default function HomeScreen() {
                       return {
                         id: res.id,
                         title: movieObj.title,
+                        poster_path: res.poster_path,
+                        release_date: movieObj.release_date,
                         movieData: movieObj,
                       };
                     })

@@ -1,4 +1,5 @@
 import { Movie } from "@/types/tmdb";
+import { Image } from "expo-image";
 import { Search, X } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import {
@@ -13,11 +14,14 @@ import {
 export interface SearchSuggestionItem {
   id: number;
   title: string;
+  poster_path?: string;
+  release_date?: string;
   movieData?: Movie;
 }
 
 interface SearchInputProps extends TextInputProps {
   onSearch: (query: string) => void;
+  onSubmitSearch?: (query: string) => void;
   suggestions?: SearchSuggestionItem[];
   onSelectSuggestion?: (item: SearchSuggestionItem) => void;
   containerStyle?: object;
@@ -27,6 +31,7 @@ export function SearchInput({
   style,
   containerStyle,
   onSearch,
+  onSubmitSearch,
   suggestions = [],
   onSelectSuggestion,
   value,
@@ -46,6 +51,15 @@ export function SearchInput({
     [suggestions, query],
   );
 
+  const handleSubmit = () => {
+    setFocused(false);
+    if (onSubmitSearch) {
+      onSubmitSearch(value ?? query);
+    } else {
+      onSearch(value ?? query);
+    }
+  };
+
   return (
     <View style={[styles.container, containerStyle]}>
       <View
@@ -57,6 +71,8 @@ export function SearchInput({
           style={[styles.input, style]}
           placeholderTextColor="rgba(255, 255, 255, 0.5)"
           placeholder={props.placeholder || "Rechercher..."}
+          returnKeyType="search"
+          onSubmitEditing={handleSubmit}
           onFocus={(event) => {
             setFocused(true);
             onFocus?.(event);
@@ -74,7 +90,7 @@ export function SearchInput({
           }}
         />
 
-        {query.length > 0 && (
+        {(value ?? query).length > 0 && (
           <Pressable
             style={styles.clearButton}
             onPress={() => {
@@ -89,36 +105,65 @@ export function SearchInput({
 
         <Pressable
           style={styles.searchButton}
-          onPress={() => {
-            onSearch(query);
-          }}
+          onPress={handleSubmit}
         >
           <Search size={20} color="rgba(255, 255, 255, 0.5)" />
         </Pressable>
       </View>
 
-      {filteredSuggestions.length > 0 && (focused || query.length > 0) ? (
+      {filteredSuggestions.length > 0 && (focused || (value ?? query).length > 0) ? (
         <View style={styles.suggestionsContainer}>
-          {filteredSuggestions.map((item, index) => (
-            <Pressable
-              key={item.id + "-" + index}
-              style={[
-                styles.suggestionItem,
-                index !== filteredSuggestions.length - 1 &&
-                  styles.suggestionBorder,
-              ]}
-              onPress={() => {
-                setQuery(item.title);
-                onChangeText?.(item.title);
-                setFocused(false);
-                if (onSelectSuggestion) {
-                  onSelectSuggestion(item);
-                }
-              }}
-            >
-              <Text style={styles.suggestionText}>{item.title}</Text>
-            </Pressable>
-          ))}
+          {filteredSuggestions.map((item, index) => {
+            const releaseYear = item.release_date
+              ? new Date(item.release_date).getFullYear()
+              : null;
+            const validYear = releaseYear && !isNaN(releaseYear) ? releaseYear : null;
+
+            return (
+              <Pressable
+                key={item.id + "-" + index}
+                style={[
+                  styles.suggestionItem,
+                  index !== filteredSuggestions.length - 1 &&
+                    styles.suggestionBorder,
+                ]}
+                onPress={() => {
+                  setQuery(item.title);
+                  onChangeText?.(item.title);
+                  setFocused(false);
+                  if (onSelectSuggestion) {
+                    onSelectSuggestion(item);
+                  }
+                }}
+              >
+                <View style={styles.posterContainer}>
+                  {item.poster_path ? (
+                    <Image
+                      source={{
+                        uri: `https://image.tmdb.org/t/p/w92${item.poster_path}`,
+                      }}
+                      style={styles.posterImage}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={styles.posterPlaceholder}>
+                      <Text style={styles.posterPlaceholderText}>N/A</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.suggestionTextContainer}>
+                  <Text style={styles.suggestionTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  {validYear && (
+                    <Text style={styles.suggestionSubtitle}>
+                      {validYear}
+                    </Text>
+                  )}
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
       ) : null}
     </View>
@@ -170,18 +215,51 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+    zIndex: 1000,
   },
   suggestionItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   suggestionBorder: {
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255, 255, 255, 0.1)",
   },
-  suggestionText: {
+  posterContainer: {
+    width: 36,
+    height: 52,
+    borderRadius: 4,
+    overflow: "hidden",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    marginRight: 12,
+  },
+  posterImage: {
+    width: "100%",
+    height: "100%",
+  },
+  posterPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  posterPlaceholderText: {
+    color: "rgba(255, 255, 255, 0.4)",
+    fontSize: 10,
+  },
+  suggestionTextContainer: {
+    flex: 1,
+  },
+  suggestionTitle: {
     color: "white",
     fontSize: 14,
     fontWeight: "500",
   },
+  suggestionSubtitle: {
+    color: "rgba(255, 255, 255, 0.5)",
+    fontSize: 12,
+    marginTop: 2,
+  },
 });
+

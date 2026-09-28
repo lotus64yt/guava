@@ -14,7 +14,8 @@
           "fetch",
           "processing"
         ]
-      }
+      },
+      "bundleIdentifier": "com.lotus64.guava"
     },
     "android": {
       "adaptiveIcon": {
@@ -40,7 +41,14 @@
           "imageWidth": 76
         }
       ],
-      "expo-video"
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": true
+        }
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true

@@ -91,8 +91,9 @@ export const DownloadProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       updateState(filmId, { status: "downloading", progress: 0, message: "Début du téléchargement..." });
 
-      const sanitizeFilename = filmTitle.replace(/[^a-zA-Z0-9 àâäéèêëîïôöùûüçÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ._-]/g, "_").trim();
+      const sanitizeFilename = filmTitle.replace(/[^a-zA-Z0-9_-]/g, "_").replace(/_+/g, "_").trim();
       const fileUri = `${FileSystem.documentDirectory}${sanitizeFilename}.mp4`;
+      const RESUME_KEY = `@guava_download_resume_${filmId}`;
 
       let startTime = Date.now();
       let lastTime = Date.now();
@@ -143,14 +144,14 @@ export const DownloadProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         });
       };
 
-      const downloadResumable = FileSystem.createDownloadResumable(
+      let downloadResumable = FileSystem.createDownloadResumable(
         vidzyUrl,
         fileUri,
         {
           headers: {
             "User-Agent":
               "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            Referer: "https://vidzy.cc/",
+            Referer: vidzyUrl.startsWith("http") ? new URL(vidzyUrl).origin + "/" : "https://vidzy.org/",
           },
           sessionType: FileSystem.FileSystemSessionType.BACKGROUND,
         },
@@ -160,9 +161,14 @@ export const DownloadProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       resumablesRef.current[filmId] = downloadResumable;
 
       const result = await downloadResumable.downloadAsync();
-      delete resumablesRef.current[filmId];
 
-      if (result && result.uri && result.status === 200) {
+      delete resumablesRef.current[filmId];
+      await AsyncStorage.removeItem(RESUME_KEY);
+
+      const fileInfo = result?.uri ? await FileSystem.getInfoAsync(result.uri) : null;
+      const isValidVideo = result && result.status === 200 && fileInfo?.exists && fileInfo.size && fileInfo.size > 50000;
+
+      if (isValidVideo && result?.uri) {
         updateState(filmId, {
           status: "completed",
           progress: 100,
@@ -185,16 +191,31 @@ export const DownloadProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setSavedVideos((prev) => ({ ...prev, [filmId]: result.uri }));
         } catch (e) {}
       } else {
+        if (result?.uri) {
+          try {
+            await FileSystem.deleteAsync(result.uri, { idempotent: true });
+          } catch (e) {}
+        }
         updateState(filmId, {
           status: "error",
           progress: 0,
-          message: "Échec du téléchargement",
+          message: "Échec du téléchargement (fichier invalide)",
         });
       }
     } catch (err: any) {
-      if (resumablesRef.current[filmId]) {
+      const resumable = resumablesRef.current[filmId];
+      if (resumable) {
+        try {
+          const snapshot = await resumable.pauseAsync();
+          const RESUME_KEY = `@guava_download_resume_${filmId}`;
+          await AsyncStorage.setItem(RESUME_KEY, JSON.stringify(snapshot));
+        } catch (e) {}
         delete resumablesRef.current[filmId];
       }
+      updateState(filmId, {
+        status: "error",
+        message: "Interrompu. Appuyez pour reprendre",
+      });
     }
   };
 
@@ -206,6 +227,8 @@ export const DownloadProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } catch (e) {}
       delete resumablesRef.current[filmId];
     }
+    const RESUME_KEY = `@guava_download_resume_${filmId}`;
+    await AsyncStorage.removeItem(RESUME_KEY);
 
     updateState(filmId, {
       status: "idle",

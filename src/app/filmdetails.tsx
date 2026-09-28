@@ -1,5 +1,6 @@
 import { useDownloads } from "@/context/DownloadContext";
 import { useFavorites } from "@/context/FavoritesContext";
+import { GetVidzyLink } from "@/services/fs";
 import { Movie } from "@/types/tmdb";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -7,13 +8,15 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowLeft,
   Calendar,
+  ChevronDown,
   Download,
   Heart,
   Play,
   Star,
   XCircle,
 } from "lucide-react-native";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { useState } from "react";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function FilmDetails() {
@@ -22,6 +25,9 @@ export default function FilmDetails() {
   const insets = useSafeAreaInsets();
   const { toggleFavorite, isFavorite } = useFavorites();
   const { startDownload, cancelDownload, getDownloadState, getLocalVideoUri } = useDownloads();
+
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const film: Movie | null = movie
     ? (JSON.parse(decodeURIComponent(movie)) as Movie)
@@ -51,6 +57,7 @@ export default function FilmDetails() {
         params: {
           uri: localUri,
           title: film.title,
+          filmId: film.id.toString(),
         },
       });
     } else if (
@@ -60,6 +67,30 @@ export default function FilmDetails() {
       cancelDownload(film.id);
     } else {
       startDownload(film.id, film.title);
+    }
+  };
+
+  const handleStreamVideo = async () => {
+    setShowDropdown(false);
+    setIsStreaming(true);
+    try {
+      const url = await GetVidzyLink(film.title);
+      setIsStreaming(false);
+      if (url) {
+        router.push({
+          pathname: "/player",
+          params: {
+            uri: url,
+            title: film.title,
+            filmId: film.id.toString(),
+          },
+        });
+      } else {
+        Alert.alert("Erreur", "Impossible de trouver un lien pour cette vidéo.");
+      }
+    } catch (e) {
+      setIsStreaming(false);
+      Alert.alert("Erreur", "Une erreur est survenue lors de la récupération.");
     }
   };
 
@@ -151,74 +182,118 @@ export default function FilmDetails() {
             </View>
           </View>
 
-          <View className="mt-6 mb-8 space-y-3">
-            <Pressable
-              className={`w-full rounded-xl overflow-hidden relative border border-zinc-800 ${
+          <View className="mt-6 mb-8 space-y-3 z-50 relative">
+            <View className="w-full relative z-50">
+              <View className={`w-full rounded-xl flex-row overflow-hidden border border-zinc-800 ${
                 downloadState.status === "completed"
                   ? "bg-emerald-500"
                   : downloadState.status === "idle" || downloadState.status === "error"
                   ? "bg-white"
                   : "bg-zinc-900"
-              }`}
-              onPress={handlePressDownload}
-            >
-              {(downloadState.status === "initialization" ||
-                downloadState.status === "downloading") && (
-                <View
-                  className="absolute top-0 bottom-0 left-0 bg-emerald-500/80"
-                  style={{
-                    width:
-                      downloadState.status === "initialization"
-                        ? "0%"
-                        : `${downloadState.progress}%`,
-                  }}
-                />
-              )}
+              }`}>
+                <Pressable
+                  className="flex-1 relative justify-center"
+                  onPress={handlePressDownload}
+                >
+                  {(downloadState.status === "initialization" ||
+                    downloadState.status === "downloading") && (
+                    <View
+                      className="absolute top-0 bottom-0 left-0 bg-emerald-500/80"
+                      style={{
+                        width:
+                          downloadState.status === "initialization"
+                            ? "0%"
+                            : `${downloadState.progress}%`,
+                      }}
+                    />
+                  )}
+                  <View className="py-3.5 px-4 flex-row items-center justify-center space-x-2 z-10">
+                    {downloadState.status === "completed" ? (
+                      <Play size={20} color="white" fill="white" />
+                    ) : downloadState.status === "initialization" ||
+                      downloadState.status === "downloading" ? (
+                      <XCircle size={20} color="white" />
+                    ) : (
+                      <Download
+                        size={20}
+                        color={
+                          downloadState.status === "idle" ||
+                          downloadState.status === "error"
+                            ? "black"
+                            : "white"
+                        }
+                      />
+                    )}
+                    <View className="flex-col items-center ml-2">
+                      <Text
+                        className={`font-semibold text-base ${
+                          downloadState.status === "completed"
+                            ? "text-white"
+                            : downloadState.status === "idle" || downloadState.status === "error"
+                            ? "text-black"
+                            : "text-white"
+                        }`}
+                      >
+                        {downloadState.status === "idle" && "Télécharger"}
+                        {downloadState.status === "initialization" &&
+                          "Initialisation..."}
+                        {downloadState.status === "downloading" &&
+                          `Téléchargement ${downloadState.progress}%`}
+                        {downloadState.status === "completed" && "Lire la vidéo"}
+                        {downloadState.status === "error" && "Réessayer"}
+                      </Text>
+                      {(downloadState.status === "initialization" ||
+                        downloadState.status === "downloading") && (
+                        <Text className="text-xs text-zinc-300 font-normal mt-0.5">
+                          {downloadState.message}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                </Pressable>
 
-              <View className="py-3.5 px-4 flex-row items-center justify-center space-x-2 z-10">
-                {downloadState.status === "completed" ? (
-                  <Play size={20} color="white" fill="white" />
-                ) : downloadState.status === "initialization" ||
-                  downloadState.status === "downloading" ? (
-                  <XCircle size={20} color="white" />
-                ) : (
-                  <Download
+                <View className={`w-[1px] ${
+                  downloadState.status === "completed"
+                    ? "bg-emerald-600"
+                    : downloadState.status === "idle" || downloadState.status === "error"
+                    ? "bg-gray-300"
+                    : "bg-zinc-800"
+                }`} />
+
+                <Pressable
+                  className="w-14 items-center justify-center z-10"
+                  onPress={() => setShowDropdown(!showDropdown)}
+                >
+                  <ChevronDown
                     size={20}
                     color={
-                      downloadState.status === "idle" ||
-                      downloadState.status === "error"
+                      downloadState.status === "idle" || downloadState.status === "error"
                         ? "black"
                         : "white"
                     }
                   />
-                )}
-                <View className="flex-col items-center ml-2">
-                  <Text
-                    className={`font-semibold text-base ${
-                      downloadState.status === "completed"
-                        ? "text-white"
-                        : downloadState.status === "idle" || downloadState.status === "error"
-                        ? "text-black"
-                        : "text-white"
-                    }`}
-                  >
-                    {downloadState.status === "idle" && "Télécharger"}
-                    {downloadState.status === "initialization" &&
-                      "Initialisation..."}
-                    {downloadState.status === "downloading" &&
-                      `Téléchargement ${downloadState.progress}%`}
-                    {downloadState.status === "completed" && "Lire la vidéo"}
-                    {downloadState.status === "error" && "Réessayer"}
-                  </Text>
-                  {(downloadState.status === "initialization" ||
-                    downloadState.status === "downloading") && (
-                    <Text className="text-xs text-zinc-300 font-normal mt-0.5">
-                      {downloadState.message}
-                    </Text>
-                  )}
-                </View>
+                </Pressable>
               </View>
-            </Pressable>
+
+              {showDropdown && (
+                <View className="absolute top-[110%] right-0 w-48 bg-zinc-800 rounded-xl border border-zinc-700 shadow-xl overflow-hidden z-50" style={{ elevation: 5 }}>
+                  <Pressable 
+                    className="p-4 flex-row items-center"
+                    onPress={handleStreamVideo}
+                    disabled={isStreaming}
+                  >
+                    {isStreaming ? (
+                      <Text className="text-white font-medium ml-2">Chargement...</Text>
+                    ) : (
+                      <>
+                        <Play size={18} color="white" fill="white" />
+                        <Text className="text-white font-medium ml-2">Streamer la vidéo</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              )}
+            </View>
 
             <Pressable
               className="w-full mt-3 flex-row bg-zinc-800 py-3.5 rounded-xl items-center justify-center border border-zinc-700 space-x-2"
