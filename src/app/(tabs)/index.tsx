@@ -178,10 +178,10 @@ export default function HomeScreen() {
                       className="text-white font-semibold text-base"
                       numberOfLines={1}
                     >
-                      {movie.title}
+                      {movie.title || movie.name || "Titre inconnu"}
                     </Text>
                     <Text className="text-zinc-400 text-xs mt-0.5" numberOfLines={1}>
-                      {new Date(movie.release_date).toLocaleDateString(
+                      {new Date(movie.release_date || movie.first_air_date || Date.now()).toLocaleDateString(
                         "fr-FR",
                         {
                           year: "numeric",
@@ -191,6 +191,7 @@ export default function HomeScreen() {
                       )}
                     </Text>
                   </Pressable>
+
                 </Link>
               ))}
             </View>

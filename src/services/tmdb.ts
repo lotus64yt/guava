@@ -27,3 +27,18 @@ export function FetchSearch(
     `https://api.themoviedb.org/3/search/multi?language=fr-FR&api_key=${TMDB_API_KEY}&query=${query}&page=${page}`,
   ).then((response) => response.json());
 }
+
+export function FetchTVShowDetails(tv_id: number): Promise<any> {
+  return fetch(
+    `https://api.themoviedb.org/3/tv/${tv_id}?language=fr-FR&api_key=${TMDB_API_KEY}`,
+  ).then((response) => response.json());
+}
+
+export function FetchTVSeasonDetails(
+  tv_id: number,
+  season_number: number,
+): Promise<any> {
+  return fetch(
+    `https://api.themoviedb.org/3/tv/${tv_id}/season/${season_number}?language=fr-FR&api_key=${TMDB_API_KEY}`,
+  ).then((response) => response.json());
+}

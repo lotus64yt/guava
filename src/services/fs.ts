@@ -131,13 +131,16 @@ export async function ResolveVidzyEmbedStreamUrl(
 export async function GetVidzyLink(
   movieTitle: string,
   onStatusChange?: (status: DownloadStatus, message?: string) => void,
+  season?: number,
+  episode?: number,
 ): Promise<string | undefined> {
   try {
     onStatusChange?.("initialization", "Initialisation...");
 
     const baseUrl = await GetCurrentFSUrl();
-
     const searchApiUrl = `${baseUrl}/engine/ajax/search.php`;
+
+    const searchQuery = season !== undefined ? `${movieTitle} saison ${season}` : movieTitle;
 
     const searchHtml = await fetch(searchApiUrl, {
       method: "POST",
@@ -146,7 +149,7 @@ export async function GetVidzyLink(
         "User-Agent":
           "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       },
-      body: `query=${encodeURIComponent(movieTitle)}&page=1`,
+      body: `query=${encodeURIComponent(searchQuery)}&page=1`,
     }).then((res) => res.text());
 
     const matches = [
@@ -190,23 +193,32 @@ export async function GetVidzyLink(
       ) {
         score -= 50;
       }
-      if (normSlug.includes("saison") && !normTarget.includes("saison")) {
-        score -= 30;
+      
+      if (season !== undefined) {
+         if (normSlug.includes(`saison ${season}`) || normSlug.includes(`saison 0${season}`) || normSlug.includes(`saison${season}`)) {
+            score += 60;
+         } else if (normSlug.includes("saison")) {
+            score -= 30; // Wrong season
+         }
+      } else {
+         if (normSlug.includes("saison") && !normTarget.includes("saison")) {
+           score -= 30;
+         }
       }
 
       const extraWords = slugWords.filter(
         (w) =>
           !targetWords.includes(w) &&
-          !["film", "streaming", "complet", "vf", "vostfr", "french"].includes(
+          !["film", "streaming", "complet", "vf", "vostfr", "french", "saison"].includes(
             w,
-          ),
+          ) && w !== season?.toString(),
       );
       score -= extraWords.length * 5;
 
       const cleanedSlug = normSlug
         .replace(/\b(film|streaming|complet|vf|vostfr|french)\b/g, "")
         .trim();
-      if (cleanedSlug === normTarget) {
+      if (cleanedSlug === normTarget && season === undefined) {
         score += 50;
       }
 
@@ -215,50 +227,100 @@ export async function GetVidzyLink(
 
     scored.sort((a, b) => b.score - a.score);
 
-    onStatusChange?.("initialization", "Initialisation...");
+    onStatusChange?.("initialization", "Recherche...");
 
     for (const item of scored.slice(0, 4)) {
-      const filmApiUrl = `${baseUrl}/engine/ajax/film_api.php?id=${item.id}`;
+      if (season !== undefined && episode !== undefined) {
+         // TV Show handling
+         const v = Math.floor(Date.now() / 30000);
+         const epsPaths = [
+            `${baseUrl}/static/series/${item.id}.js?v=${v}`,
+            `${baseUrl}/ep-data.php?id=${item.id}&format=js&v=${v}`
+         ];
 
-      const res = await fetch(filmApiUrl, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        },
-      });
+         let epData: any = null;
+         for (const epsUrl of epsPaths) {
+            try {
+               const res = await fetch(epsUrl, {
+                  headers: {
+                    "User-Agent":
+                      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                  }
+               });
+               if (!res.ok) continue;
+               const text = await res.text();
+               epData = JSON.parse(text);
+               if (epData) break;
+            } catch (e) {}
+         }
 
-      if (!res.ok) continue;
+         if (epData) {
+            const epString = episode.toString();
+            let episodePlayerInfo = null;
+            if (epData.vf && epData.vf[epString]) {
+               episodePlayerInfo = epData.vf[epString];
+            } else if (epData.vostfr && epData.vostfr[epString]) {
+               episodePlayerInfo = epData.vostfr[epString];
+            }
 
-      const data = await res.json();
-      const vidzyPlayers = data?.players?.vidzy;
+            if (episodePlayerInfo) {
+               const embedUrl = episodePlayerInfo.vidzy || episodePlayerInfo.premium || episodePlayerInfo.uqload;
+               if (embedUrl) {
+                  const streamUrl = await ResolveVidzyEmbedStreamUrl(embedUrl, onStatusChange);
+                  if (streamUrl) return streamUrl;
 
-      if (vidzyPlayers) {
-        const embedUrl =
-          vidzyPlayers.default ||
-          vidzyPlayers.vostfr ||
-          vidzyPlayers.vfq ||
-          vidzyPlayers.vff;
+                  if (embedUrl.includes("vidzy")) {
+                      const vidzyPageUrl = embedUrl.replace(/\/embed-([a-zA-Z0-9_-]+)\.html/i, "/d/$1.html");
+                      const directFileUrl = await ResolveDirectDownloadUrl(vidzyPageUrl, onStatusChange);
+                      return directFileUrl || vidzyPageUrl;
+                  }
+               }
+            }
+         }
+      } else {
+        // Movie handling
+        const filmApiUrl = `${baseUrl}/engine/ajax/film_api.php?id=${item.id}`;
 
-        if (embedUrl) {
-          const streamUrl = await ResolveVidzyEmbedStreamUrl(
-            embedUrl,
-            onStatusChange,
-          );
-          if (streamUrl) {
-            return streamUrl;
+        const res = await fetch(filmApiUrl, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          },
+        });
+
+        if (!res.ok) continue;
+
+        const data = await res.json();
+        const vidzyPlayers = data?.players?.vidzy;
+
+        if (vidzyPlayers) {
+          const embedUrl =
+            vidzyPlayers.default ||
+            vidzyPlayers.vostfr ||
+            vidzyPlayers.vfq ||
+            vidzyPlayers.vff;
+
+          if (embedUrl) {
+            const streamUrl = await ResolveVidzyEmbedStreamUrl(
+              embedUrl,
+              onStatusChange,
+            );
+            if (streamUrl) {
+              return streamUrl;
+            }
+
+            const vidzyPageUrl = embedUrl.replace(
+              /\/embed-([a-zA-Z0-9_-]+)\.html/i,
+              "/d/$1.html",
+            );
+
+            const directFileUrl = await ResolveDirectDownloadUrl(
+              vidzyPageUrl,
+              onStatusChange,
+            );
+
+            return directFileUrl || vidzyPageUrl;
           }
-
-          const vidzyPageUrl = embedUrl.replace(
-            /\/embed-([a-zA-Z0-9_-]+)\.html/i,
-            "/d/$1.html",
-          );
-
-          const directFileUrl = await ResolveDirectDownloadUrl(
-            vidzyPageUrl,
-            onStatusChange,
-          );
-
-          return directFileUrl || vidzyPageUrl;
         }
       }
     }
